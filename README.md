@@ -32,6 +32,7 @@ Lua user patches, a Spotify plugin, an English-learning screen and a home-grown 
 | `patches/2-agora-lev.lua` | Home row with two cards: Spotify now playing, and Word of the day with its meaning. |
 | `patches/2-palavra-lev.lua` | Word of the day: 100 curated words, study screen (pronunciation, examples, synonyms from the Free Dictionary API, cached offline) and a quiz. |
 | `patches/2-faixa-livros-lev.lua` | Home book strip without filters, left-aligned, tighter covers. |
+| `patches/2-biblioteca-lev.lua` | Clean Library: hides system folders at the storage root (`koreader`, `system`, `Digital Editions`, `Fonts`, `Imagens`, `Pictures`); nothing is deleted. |
 | `patches/2-botoes-lev.lua` | Context-aware physical buttons: Home short press = menu, long press = Home; side buttons turn pages in lists, change brightness in the menu, skip tracks in Spotify. |
 | `patches/2-brilho-ui-lev.lua` | Brightness control redesigned for an imprecise touchscreen: 8 steps, round −/+ buttons, half-row tap zones. |
 | `patches/2-luz-lev.lua` | Frontlight fixes: gamma curve and a "kick" that unfreezes the PWM after the light was off or the device slept. |
