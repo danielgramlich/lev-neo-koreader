@@ -1,0 +1,33 @@
+# secrets and device-specific settings
+token.json
+*.token
+spotify.lua
+!templates/settings/spotify.example.lua
+settings/
+*api_key*
+*hardcover_token*
+aplists.xml
+ssh_*.conf
+authorized_keys
+id_*
+*.pem
+.env
+# device images, firmware and binaries
+*.img
+*.bin
+*.ko
+*.fex
+# books and covers
+*.epub
+*.pdf
+*.mobi
+*.azw3
+covers/
+capas*/
+# local junk
+.DS_Store
+._*
+__pycache__/
+*.pyc
+*.v[0-9]
+*.antes_*
