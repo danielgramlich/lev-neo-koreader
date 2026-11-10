@@ -212,8 +212,9 @@ local function construir(ctx)
     -- Word of the day (2-palavra-lev.lua) no lugar do the news
     local P = rawget(_G, "__LEV_PALAVRA")
     local e = P and P.hoje()
-    local c_tn = cartao(W - lw - gap, H, "tab_translate", "Word of the day",
-        e and e.palavra or "Word of the day",
+    local rotulo = (P and P.rotulo) or "Expression of the day"
+    local c_tn = cartao(W - lw - gap, H, "tab_translate", rotulo,
+        e and e.palavra or rotulo,
         e and e.classe or "tap to open", function()
             local PP = rawget(_G, "__LEV_PALAVRA")
             if PP then PP.abrir() end
@@ -233,7 +234,7 @@ userpatch.registerPatchPluginFunc("zenos", function()
             local ok_b, w = pcall(construir, ctx)
             if ok_b then return w end
             logger.warn("Lev agora: erro ao montar:", w)
-        end, { label = "Agora", size = { units = 2 } })
+        end, { label = "Agora", size = { units = 2.3 } })
     end
     registrar()
     logger.info("Lev: faixa Agora no Inicio ativa")

@@ -29,8 +29,8 @@ Lua user patches, a Spotify plugin, an English-learning screen and a home-grown 
 | `patches/1-fuso-lev.lua` | Time zone from `/etc/TZ` (KOReader starts without `TZ`). |
 | `patches/2-abrindo-lev.lua` | One standard loading modal (centered pill) for every slow action; replaces ZenOS's "Opening" strip and the engine's top-left progress bar. Exposes `_G.__LEV_MODAL`. |
 | `patches/2-saudacao-lev.lua` | Home greeting ("Good morning, *name*") with the date. |
-| `patches/2-agora-lev.lua` | Home row with two cards: Spotify now playing, and Word of the day with its meaning. |
-| `patches/2-palavra-lev.lua` | Word of the day: 100 curated words, study screen (pronunciation, examples, synonyms from the Free Dictionary API, cached offline) and a quiz. |
+| `patches/2-agora-lev.lua` | Home row with two cards: Spotify now playing, and Expression of the day with its meaning. |
+| `patches/2-palavra-lev.lua` | Expression of the day: 133 curated English expressions for fluency (conversation, opinions, work, phrasal verbs, reactions, polite requests, idioms, common mistakes for Portuguese speakers), each with a plain-English meaning, the Portuguese equivalent, two examples and a usage tip; fully offline. Quiz alternates "what does it mean?" and "how do you say it in English?". |
 | `patches/2-faixa-livros-lev.lua` | Home book strip without filters, left-aligned, tighter covers. |
 | `patches/2-biblioteca-lev.lua` | Clean Library: hides system folders at the storage root (`koreader`, `system`, `Digital Editions`, `Fonts`, `Imagens`, `Pictures`); nothing is deleted. |
 | `patches/2-botoes-lev.lua` | Context-aware physical buttons: Home short press = menu, long press = Home; side buttons turn pages in lists, change brightness in the menu, skip tracks in Spotify. |

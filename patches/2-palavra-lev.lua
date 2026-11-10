@@ -1,14 +1,17 @@
--- Lev Neo (2026-11-09): Word of the day — uma palavra em ingles por dia para estudar.
--- * Lista propria de palavras (classe, definicao em ingles e exemplo), escolhida pelo dia do ano.
--- * Com Wi-Fi, busca pronuncia, mais definicoes, exemplos e sinonimos no Free Dictionary API
---   (api.dictionaryapi.dev) e guarda em settings/lev_palavras.lua (funciona offline depois).
--- * Tela de estudo (mesmo estilo da tela do Spotify, acima da barra inferior):
---   palavra, pronuncia, definicoes, exemplos, sinonimos; "Previous words" e "Quiz".
+-- Lev Neo (2026-11-10, v2): Expression of the day — uma expressao util em ingles por dia,
+-- para ganhar fluencia (antes: palavra do dia).
+-- * Lista propria de ~130 expressoes de conversa real: conectores, opinioes, trabalho,
+--   phrasal verbs, reacoes, pedidos educados, tempo e planos, idioms e erros classicos
+--   de brasileiros. Cada uma tem significado em ingles simples, equivalente natural em
+--   portugues, dois exemplos e uma dica de uso. Tudo offline.
+-- * Tela de estudo acima da barra inferior: expressao, significado, "In Portuguese",
+--   exemplos e dica; "Previous", "Quiz" e "Today".
+-- * Quiz alterna dois tipos: "What does it mean?" e "How do you say it in English?".
 -- * Cartao no Inicio: faixa "Agora" (2-agora-lev.lua) usa _G.__LEV_PALAVRA.
--- Botoes fisicos na tela: laterais = palavra anterior / seguinte; esquerda segurada = sair.
--- Para desfazer: apague este arquivo.
+-- Botoes fisicos na tela: laterais = anterior / seguinte; direita segurada = quiz;
+-- esquerda segurada = sair.
+-- Para desfazer: apague este arquivo (versao anterior: 2-palavra-lev.lua.v1_palavras no Mac).
 local Blitbuffer = require("ffi/blitbuffer")
-local CenterContainer = require("ui/widget/container/centercontainer")
 local DataStorage = require("datastorage")
 local Device = require("device")
 local Event = require("ui/event")
@@ -31,112 +34,430 @@ local Screen = Device.screen
 local PRETO, BRANCO = Blitbuffer.COLOR_BLACK, Blitbuffer.COLOR_WHITE
 local CINZA, CLARO = Blitbuffer.COLOR_DARK_GRAY, Blitbuffer.COLOR_LIGHT_GRAY
 
--- { palavra, classe, definicao, exemplo }
-local PALAVRAS = {
-    { "meticulous", "adjective", "Showing great attention to every small detail.", "She kept meticulous notes of every experiment." },
-    { "resilient", "adjective", "Able to recover quickly after something difficult.", "Children are often more resilient than adults expect." },
-    { "ubiquitous", "adjective", "Found everywhere; very common.", "Smartphones have become ubiquitous in modern life." },
-    { "candid", "adjective", "Honest and direct, even when the truth is uncomfortable.", "He gave a candid answer about his mistakes." },
-    { "eloquent", "adjective", "Able to express ideas clearly and persuasively.", "Her eloquent speech moved the whole audience." },
-    { "pragmatic", "adjective", "Dealing with things in a practical, realistic way.", "We need a pragmatic solution, not a perfect one." },
-    { "diligent", "adjective", "Working carefully and with steady effort.", "A diligent student reviews the lesson every night." },
-    { "ambiguous", "adjective", "Open to more than one interpretation.", "The contract's wording was ambiguous." },
-    { "tenacious", "adjective", "Holding firmly to a goal; not giving up easily.", "The tenacious reporter followed the story for years." },
-    { "serene", "adjective", "Calm, peaceful and untroubled.", "The lake looked serene in the early morning." },
-    { "frugal", "adjective", "Careful not to waste money or resources.", "They lived a frugal life and saved for travel." },
-    { "vivid", "adjective", "Producing strong, clear images in the mind.", "He has vivid memories of his first trip abroad." },
-    { "profound", "adjective", "Very deep, intense or far-reaching.", "The book had a profound effect on my thinking." },
-    { "subtle", "adjective", "Delicate and hard to notice at first.", "There is a subtle difference between the two colors." },
-    { "inevitable", "adjective", "Certain to happen; impossible to avoid.", "Some change is inevitable as a company grows." },
-    { "genuine", "adjective", "Real and sincere, not fake.", "She showed genuine interest in our ideas." },
-    { "thorough", "adjective", "Complete and careful, covering every part.", "The doctor did a thorough examination." },
-    { "reluctant", "adjective", "Unwilling and hesitant to do something.", "He was reluctant to leave the party early." },
-    { "obsolete", "adjective", "No longer used because something newer exists.", "Fax machines are almost obsolete now." },
-    { "versatile", "adjective", "Able to adapt to many different uses or tasks.", "A versatile actor can play comedy and drama." },
-    { "concise", "adjective", "Giving a lot of information in few words.", "Keep your summary short and concise." },
-    { "arduous", "adjective", "Very difficult and tiring.", "The climb to the summit was long and arduous." },
-    { "benevolent", "adjective", "Kind and wanting to help others.", "A benevolent stranger paid for our coffee." },
-    { "cautious", "adjective", "Careful to avoid risks or danger.", "Be cautious when driving on wet roads." },
-    { "elusive", "adjective", "Difficult to find, catch or understand.", "Happiness can feel elusive when you chase it." },
-    { "feasible", "adjective", "Possible to do or achieve.", "Is it feasible to finish the project by Friday?" },
-    { "gregarious", "adjective", "Enjoying the company of other people.", "Our gregarious neighbor knows everyone on the street." },
-    { "humble", "adjective", "Not proud; modest about your own importance.", "Despite his success, he remained humble." },
-    { "impeccable", "adjective", "Perfect; without any fault.", "Her English pronunciation is impeccable." },
-    { "lucid", "adjective", "Clear and easy to understand.", "The teacher gave a lucid explanation of the rule." },
-    { "mundane", "adjective", "Ordinary and not interesting.", "He wanted to escape his mundane routine." },
-    { "nostalgic", "adjective", "Feeling a happy sadness for the past.", "Old songs make me feel nostalgic." },
-    { "outspoken", "adjective", "Saying openly what you think.", "She is an outspoken critic of the plan." },
-    { "plausible", "adjective", "Seeming reasonable or likely to be true.", "His excuse sounded plausible at first." },
-    { "relentless", "adjective", "Continuing strongly without stopping.", "The relentless rain lasted all week." },
-    { "spontaneous", "adjective", "Done naturally, without planning.", "We took a spontaneous trip to the beach." },
-    { "trivial", "adjective", "Of little value or importance.", "Don't argue about trivial details." },
-    { "vulnerable", "adjective", "Easily hurt, physically or emotionally.", "Elderly people are more vulnerable to the flu." },
-    { "wary", "adjective", "Careful because you think something may be wrong.", "Be wary of offers that look too good." },
-    { "zealous", "adjective", "Full of strong enthusiasm for a cause.", "The zealous fans waited outside for hours." },
-    { "acknowledge", "verb", "To accept or admit that something is true.", "He acknowledged that he had made an error." },
-    { "advocate", "verb", "To publicly support an idea or cause.", "She advocates for better public libraries." },
-    { "alleviate", "verb", "To make pain or a problem less severe.", "This medicine will alleviate the headache." },
-    { "anticipate", "verb", "To expect something and prepare for it.", "We anticipate a lot of traffic tomorrow." },
-    { "clarify", "verb", "To make something easier to understand.", "Could you clarify what you mean?" },
-    { "cultivate", "verb", "To develop a skill, habit or relationship over time.", "Reading daily helps you cultivate focus." },
-    { "deteriorate", "verb", "To become worse over time.", "The old bridge began to deteriorate." },
-    { "embrace", "verb", "To accept something willingly and with enthusiasm.", "The team embraced the new method." },
-    { "endure", "verb", "To suffer something difficult patiently.", "They had to endure a cold winter." },
-    { "enhance", "verb", "To improve the quality or value of something.", "Good lighting can enhance a photograph." },
-    { "foster", "verb", "To encourage the development of something.", "Teachers should foster curiosity." },
-    { "hinder", "verb", "To make something slower or more difficult.", "Bad weather hindered the rescue." },
-    { "linger", "verb", "To stay somewhere longer than necessary.", "The smell of coffee lingered in the room." },
-    { "mitigate", "verb", "To make something bad less serious.", "Trees can mitigate the effects of heat." },
-    { "overcome", "verb", "To succeed in dealing with a difficulty.", "She overcame her fear of public speaking." },
-    { "persevere", "verb", "To keep trying despite difficulties.", "If you persevere, your English will improve." },
-    { "ponder", "verb", "To think carefully about something.", "He pondered the question before answering." },
-    { "relish", "verb", "To enjoy something very much.", "I relish quiet Sunday mornings." },
-    { "scrutinize", "verb", "To examine something very carefully.", "The editor scrutinized every sentence." },
-    { "thrive", "verb", "To grow, develop or succeed well.", "Plants thrive in this warm climate." },
-    { "undermine", "verb", "To gradually weaken something.", "Constant criticism can undermine confidence." },
-    { "yearn", "verb", "To want something very strongly.", "She yearned to see her family again." },
-    { "convey", "verb", "To communicate an idea or feeling.", "Music can convey emotions words cannot." },
-    { "dwell", "verb", "To keep thinking or talking about something.", "Don't dwell on your past mistakes." },
-    { "grasp", "verb", "To understand something completely.", "It took me a while to grasp the idea." },
-    { "procrastinate", "verb", "To delay doing something you should do.", "I tend to procrastinate when a task feels big." },
-    { "reconcile", "verb", "To restore a friendly relationship; to make things agree.", "The brothers finally reconciled." },
-    { "savor", "verb", "To enjoy something slowly and completely.", "Savor every page of a good book." },
-    { "wander", "verb", "To walk around without a fixed direction.", "We wandered through the old streets." },
-    { "insight", "noun", "A deep and clear understanding of something.", "The interview gave us insight into her work." },
-    { "dilemma", "noun", "A situation where you must choose between two difficult options.", "Taking the job created a real dilemma." },
-    { "endeavor", "noun", "A serious attempt to do something.", "Learning a language is a long endeavor." },
-    { "hindsight", "noun", "Understanding an event only after it has happened.", "In hindsight, we should have left earlier." },
-    { "milestone", "noun", "An important event or stage in progress.", "Finishing the first book was a milestone." },
-    { "nuance", "noun", "A very small difference in meaning or feeling.", "Translation often loses the nuance of a joke." },
-    { "perspective", "noun", "A particular way of seeing things.", "Travel gives you a new perspective." },
-    { "resilience", "noun", "The ability to recover quickly from difficulties.", "Her resilience inspired everyone." },
-    { "solitude", "noun", "The state of being alone, often peacefully.", "He enjoys the solitude of early mornings." },
-    { "wisdom", "noun", "The ability to make good judgments from experience.", "Grandparents often share great wisdom." },
-    { "awe", "noun", "A feeling of great respect mixed with wonder.", "We watched the sunset in awe." },
-    { "clarity", "noun", "The quality of being clear and easy to understand.", "Writing improves the clarity of your thoughts." },
-    { "curiosity", "noun", "A strong desire to know or learn something.", "Curiosity is the engine of learning." },
-    { "empathy", "noun", "The ability to understand and share another's feelings.", "Good leaders show empathy." },
-    { "gratitude", "noun", "The feeling of being thankful.", "She expressed her gratitude with a letter." },
-    { "integrity", "noun", "The quality of being honest and having strong principles.", "He is a man of great integrity." },
-    { "momentum", "noun", "The force that keeps something moving or growing.", "The campaign gained momentum after the debate." },
-    { "paradox", "noun", "A statement that seems to contradict itself but may be true.", "It's a paradox: the more I learn, the less I know." },
-    { "routine", "noun", "A usual, regular way of doing things.", "Reading before bed is part of my routine." },
-    { "threshold", "noun", "The point at which something begins or changes.", "We are on the threshold of a new era." },
-    { "turmoil", "noun", "A state of great confusion or disorder.", "The country was in political turmoil." },
-    { "whim", "noun", "A sudden wish or idea, often without reason.", "She bought the dress on a whim." },
-    { "meanwhile", "adverb", "At the same time; while something else happens.", "Dinner is cooking; meanwhile, set the table." },
-    { "nevertheless", "adverb", "In spite of what was just said.", "It was raining; nevertheless, we went out." },
-    { "seldom", "adverb", "Not often; rarely.", "He seldom watches television." },
-    { "thoroughly", "adverb", "Completely and carefully.", "Read the instructions thoroughly." },
-    { "eventually", "adverb", "In the end, after a long time.", "Eventually, the rain stopped." },
-    { "deliberately", "adverb", "On purpose; intentionally.", "He deliberately left the door open." },
-    { "barely", "adverb", "Only just; almost not.", "I could barely hear the music." },
-    { "albeit", "conjunction", "Although; even though.", "It was a good result, albeit a small one." },
-    { "whereas", "conjunction", "In contrast with the fact that.", "I like tea, whereas my wife prefers coffee." },
+-- { expressao, categoria, significado, em portugues, exemplo 1, exemplo 2, dica }
+local EXPRESSOES = {
+    -- Conversation
+    { "By the way", "Conversation", "Used to add something new to the conversation.", "A propósito / aliás",
+      "By the way, did you call your mom back?", "Oh, by the way, the meeting moved to 3 p.m.",
+      "In texts people write BTW." },
+    { "Speaking of which", "Conversation", "Used to connect a new idea to something just mentioned.", "Falando nisso",
+      "You said you were hungry. Speaking of which, want to grab lunch?", "Speaking of which, have you finished that report?",
+      "A smooth way to change topic without sounding abrupt." },
+    { "Long story short", "Conversation", "Used to skip the details and give the main point.", "Resumindo a história",
+      "Long story short, we missed the flight.", "Long story short, I got the job.",
+      "Great for telling stories without getting lost in details." },
+    { "What I mean is…", "Conversation", "Used to explain again what you just said, more clearly.", "O que eu quero dizer é…",
+      "What I mean is, we need more time, not more people.", "Sorry, that came out wrong. What I mean is I liked it.",
+      "Use it to fix a sentence that came out confusing. Fluent speakers do this all the time." },
+    { "Let me see", "Conversation", "Used to give yourself a moment to think.", "Deixa eu ver",
+      "Let me see… I think it was last Tuesday.", "How many people are coming? Let me see, about twelve.",
+      "Sounds much more natural than a long \"ehhh\"." },
+    { "Anyway", "Conversation", "Used to return to the main topic or to close a topic.", "Enfim / de qualquer forma",
+      "Anyway, where was I?", "Anyway, I have to go. Talk soon!",
+      "Natural way to end a conversation politely." },
+    { "To be honest", "Conversation", "Used before saying what you really think.", "Para ser sincero",
+      "To be honest, I didn't like the movie.", "To be honest, I forgot about it.",
+      "In texts: TBH. \"Honestly\" works too." },
+    { "As far as I know", "Conversation", "Based on the information I have (I might be wrong).", "Até onde eu sei",
+      "As far as I know, the store opens at nine.", "As far as I know, nobody has complained.",
+      "Protects you when you're not 100% sure." },
+    { "If I remember correctly", "Conversation", "Used when you think something is true but aren't certain.", "Se não me engano",
+      "If I remember correctly, she lives in Boston.", "The trip was in 2019, if I remember correctly.",
+      "Can go at the start or at the end of the sentence." },
+    { "It depends on…", "Conversation", "The answer changes according to something else.", "Depende de…",
+      "It depends on the weather.", "Whether we go or not depends on the price.",
+      "Classic mistake: it's \"depends ON\", never \"depends OF\"." },
+    { "Kind of", "Conversation", "A little; not completely.", "Meio que / mais ou menos",
+      "I'm kind of tired today.", "It was kind of funny, actually.",
+      "\"Sort of\" means the same. Very common in casual speech." },
+    { "I guess", "Conversation", "I think so, but I'm not very sure.", "Acho que sim / pelo jeito",
+      "I guess you're right.", "— Are you coming? — I guess so.",
+      "Softer and less certain than \"I think\"." },
+    { "What's up?", "Conversation", "Informal hello: how are you, what's new?", "E aí? / Beleza?",
+      "Hey, what's up? Long time no see!", "— What's up? — Not much, just working.",
+      "Answer with \"Not much\" or \"Nothing much\", not \"I'm fine\"." },
+
+    -- Opinions
+    { "If you ask me", "Opinions", "Used to give your personal opinion, often a strong one.", "Se quer saber a minha opinião",
+      "If you ask me, the old version was better.", "If you ask me, he should apologize.",
+      "Sounds confident but still personal." },
+    { "I'd say…", "Opinions", "A soft way to give an opinion or an estimate.", "Eu diria que…",
+      "I'd say it takes about an hour.", "I'd say she's the best person for the job.",
+      "Perfect for estimates: \"I'd say around fifty people\"." },
+    { "I'm on the fence", "Opinions", "I haven't decided yet.", "Estou em cima do muro / indeciso",
+      "I'm on the fence about buying a new car.", "She's still on the fence about the offer.",
+      "Use \"about\" + the topic." },
+    { "It's not my cup of tea", "Opinions", "It's not something I enjoy.", "Não é a minha praia",
+      "Horror movies aren't really my cup of tea.", "Jazz is nice, but it's not my cup of tea.",
+      "A polite way to say you don't like something." },
+    { "I couldn't agree more", "Opinions", "I agree completely.", "Concordo plenamente",
+      "— We need a break. — I couldn't agree more.", "I couldn't agree more with what you said.",
+      "Sounds negative, but it means total agreement." },
+    { "That's a good point", "Opinions", "Used to accept that someone's argument is good.", "Bem lembrado / bom argumento",
+      "That's a good point. I hadn't thought of that.", "Okay, that's a good point, but it's still expensive.",
+      "Great for meetings: it shows you're listening." },
+    { "I see what you mean, but…", "Opinions", "A polite way to disagree.", "Entendo o seu ponto, mas…",
+      "I see what you mean, but I think it's too risky.", "I see what you mean, but we don't have the budget.",
+      "Disagree without sounding rude." },
+    { "I'm not so sure about that", "Opinions", "A gentle way to say you disagree.", "Não tenho tanta certeza",
+      "— It'll be easy. — Hmm, I'm not so sure about that.", "I'm not so sure about that plan.",
+      "Softer than \"I disagree\"." },
+    { "Fair enough", "Opinions", "That's reasonable; I accept it.", "Justo / tá certo",
+      "— I can't come, I'm working. — Fair enough.", "Fair enough, let's do it your way.",
+      "Very common in British and American English." },
+    { "That makes sense", "Opinions", "That is logical; I understand.", "Faz sentido",
+      "Oh, that makes sense now.", "Does that make sense?",
+      "Classic mistake: never \"it does sense\". It's MAKE sense." },
+    { "It's up to you", "Opinions", "You decide.", "Você que sabe / você decide",
+      "Pizza or sushi? It's up to you.", "It's up to you whether we leave now or later.",
+      "\"Up to me\" = I decide." },
+    { "Either way", "Opinions", "In both cases; whatever happens.", "De qualquer jeito",
+      "We can take the bus or walk. Either way, we'll be late.", "Either way, I'm happy.",
+      "Good to show you're flexible." },
+
+    -- Work
+    { "Let's get started", "Work", "Let's begin.", "Vamos começar",
+      "Okay everyone, let's get started.", "Let's get started with the first topic.",
+      "Standard way to open a meeting." },
+    { "I'll get back to you", "Work", "I'll answer later, after I check.", "Te dou um retorno",
+      "Let me check my calendar and get back to you.", "I'll get back to you by Friday.",
+      "Professional way to say \"I don't know yet\"." },
+    { "Touch base", "Work", "Make brief contact to share updates.", "Alinhar rapidinho / dar uma atualizada",
+      "Let's touch base next week.", "I just wanted to touch base about the project.",
+      "Common in work emails." },
+    { "On the same page", "Work", "Having the same understanding.", "Alinhados",
+      "Let's make sure we're on the same page.", "Are we all on the same page?",
+      "Use it before or after explaining a plan." },
+    { "Keep me posted", "Work", "Keep me informed about any news.", "Me mantenha informado",
+      "Keep me posted on the results.", "Thanks! Keep me posted.",
+      "Friendly and professional at the same time." },
+    { "Follow up on", "Work", "Check on something again later.", "Dar seguimento / retomar",
+      "I'm following up on my last email.", "Can you follow up on that request?",
+      "\"Just following up\" is the classic polite reminder." },
+    { "I'm running late", "Work", "I'm going to arrive later than planned.", "Estou atrasado (a caminho)",
+      "Sorry, I'm running late. Be there in ten.", "The train is running late today.",
+      "Send this BEFORE you're late; it's polite." },
+    { "Bring up", "Work", "Mention a subject.", "Levantar / mencionar (um assunto)",
+      "I'd like to bring up something important.", "Don't bring up politics at dinner.",
+      "Phrasal verb. Also means \"raise\" a child." },
+    { "Look into", "Work", "Investigate or check something.", "Verificar / dar uma olhada",
+      "I'll look into the problem today.", "We're looking into what happened.",
+      "Promises action without promising a solution." },
+    { "Call it a day", "Work", "Stop working for today.", "Encerrar por hoje",
+      "It's late. Let's call it a day.", "We called it a day at six.",
+      "Very common at the end of the workday." },
+    { "The bottom line", "Work", "The most important point or result.", "No fim das contas / o principal",
+      "The bottom line is we need more customers.", "What's the bottom line?",
+      "Use it to cut to the main point." },
+    { "A ballpark figure", "Work", "A rough estimate.", "Um número aproximado",
+      "Can you give me a ballpark figure?", "Just a ballpark: around ten thousand.",
+      "Shows you only need an estimate, not exact numbers." },
+    { "Get the ball rolling", "Work", "Start something.", "Dar o pontapé inicial",
+      "Let's get the ball rolling with a quick intro.", "Who wants to get the ball rolling?",
+      "Common at the start of meetings and projects." },
+    { "Learn the ropes", "Work", "Learn how a job or place works.", "Aprender como as coisas funcionam",
+      "It took me a month to learn the ropes.", "She's still learning the ropes.",
+      "Perfect for talking about a new job." },
+    { "Have a lot on my plate", "Work", "Have many things to do.", "Estar cheio de coisas pra fazer",
+      "I have a lot on my plate this week.", "Sorry, I've got too much on my plate right now.",
+      "A polite way to say no to extra work." },
+
+    -- Phrasal verbs
+    { "Figure out", "Phrasal verb", "Understand or solve something.", "Entender / descobrir / resolver",
+      "I can't figure out how this works.", "We'll figure it out together.",
+      "One of the most useful phrasal verbs in daily life." },
+    { "Come up with", "Phrasal verb", "Think of an idea or a plan.", "Ter (uma ideia) / bolar",
+      "She came up with a great idea.", "We need to come up with a solution.",
+      "Always \"come up WITH\" + the idea." },
+    { "Deal with", "Phrasal verb", "Handle a problem, a task or a person.", "Lidar com",
+      "I'll deal with it tomorrow.", "He's hard to deal with.",
+      "Past: dealt with." },
+    { "Sort out", "Phrasal verb", "Fix or organize something.", "Resolver / organizar",
+      "Let's sort out the details later.", "I need to sort out my papers.",
+      "Very common, especially in British English." },
+    { "Put off", "Phrasal verb", "Postpone; do later.", "Adiar / enrolar",
+      "Stop putting it off and just do it.", "They put off the meeting until Monday.",
+      "Followed by -ing: \"put off doing\"." },
+    { "Call off", "Phrasal verb", "Cancel.", "Cancelar",
+      "They called off the game because of the rain.", "The wedding was called off.",
+      "More natural than \"cancel\" in conversation." },
+    { "Find out", "Phrasal verb", "Discover information.", "Descobrir / ficar sabendo",
+      "I just found out she's moving.", "Let me find out what time it starts.",
+      "Use it for information. For solving problems, \"figure out\"." },
+    { "Catch up", "Phrasal verb", "Talk about recent news, or reach the same level.", "Colocar o papo em dia / alcançar",
+      "Let's grab coffee and catch up.", "I missed a week, so I need to catch up.",
+      "\"Catch up with someone\" = meet and talk." },
+    { "Hang out", "Phrasal verb", "Spend time together casually.", "Sair / passar um tempo junto",
+      "We hung out at the park all afternoon.", "Do you want to hang out this weekend?",
+      "Informal and very common." },
+    { "Show up", "Phrasal verb", "Arrive or appear, often unexpectedly.", "Aparecer",
+      "He showed up an hour late.", "Only five people showed up.",
+      "Used a lot when someone doesn't come: \"he didn't show up\"." },
+    { "Turn down", "Phrasal verb", "Reject an offer; lower the volume.", "Recusar / abaixar",
+      "She turned down the job offer.", "Can you turn down the music?",
+      "Two very different meanings; context decides." },
+    { "Give up", "Phrasal verb", "Stop trying.", "Desistir",
+      "Don't give up, you're almost there.", "I gave up sugar last year.",
+      "\"Give up + something\" = stop having it." },
+    { "Get along with", "Phrasal verb", "Have a good relationship with someone.", "Se dar bem com",
+      "I get along well with my coworkers.", "Do you get along with your brother?",
+      "\"Get on with\" means the same in British English." },
+    { "Look forward to", "Phrasal verb", "Feel happy about something that will happen.", "Estar ansioso por (no bom sentido)",
+      "I'm looking forward to seeing you.", "We look forward to your reply.",
+      "Classic trap: TO + -ing. \"Looking forward to SEEING\", not \"to see\"." },
+    { "Run out of", "Phrasal verb", "Have no more of something.", "Ficar sem / acabar",
+      "We ran out of coffee.", "I'm running out of time.",
+      "The thing that ends comes after \"of\"." },
+    { "End up", "Phrasal verb", "Finally be in a situation you didn't plan.", "Acabar (fazendo / em algum lugar)",
+      "We ended up staying until midnight.", "He ended up in Canada.",
+      "Followed by -ing or a place." },
+    { "Work out", "Phrasal verb", "Exercise; or have a good result.", "Malhar / dar certo",
+      "I work out three times a week.", "Don't worry, it'll work out.",
+      "\"It didn't work out\" = it failed (also for relationships)." },
+    { "Make up your mind", "Phrasal verb", "Decide.", "Se decidir",
+      "Make up your mind, we're leaving!", "I can't make up my mind.",
+      "Change the pronoun: my mind, her mind, their mind." },
+    { "Give it a try", "Phrasal verb", "Try something.", "Tentar / experimentar",
+      "I've never surfed, but I'll give it a try.", "Give it a try, you might like it.",
+      "\"Give it a shot\" means the same." },
+    { "Count me in", "Phrasal verb", "Include me; I want to participate.", "Pode contar comigo",
+      "Pizza tonight? Count me in!", "If you need help, count me in.",
+      "Opposite: \"Count me out\"." },
+
+    -- Reactions
+    { "No way!", "Reactions", "Expresses surprise, or a strong no.", "Não acredito! / De jeito nenhum!",
+      "— I got the job! — No way! Congrats!", "Lend him my car? No way.",
+      "Tone of voice decides if it's surprise or refusal." },
+    { "Good for you!", "Reactions", "I'm happy about your success.", "Que bom pra você!",
+      "You finished the marathon? Good for you!", "— I quit smoking. — Good for you!",
+      "Sincere when said warmly." },
+    { "That's a shame", "Reactions", "That's sad or disappointing.", "Que pena",
+      "You can't come? That's a shame.", "It's a shame the store closed.",
+      "\"What a shame\" works too." },
+    { "Tell me about it", "Reactions", "I know exactly what you mean (about something bad).", "Nem me fala",
+      "— This traffic is terrible. — Tell me about it.", "— Mondays are so long. — Tell me about it!",
+      "It does NOT mean \"tell me more\"." },
+    { "Same here", "Reactions", "Me too.", "Eu também / idem",
+      "— I'm starving. — Same here.", "— I loved the show. — Same here!",
+      "Informal and quick." },
+    { "You bet", "Reactions", "Certainly; also an answer to \"thank you\".", "Com certeza / imagina",
+      "— Are you coming? — You bet!", "— Thanks for the help. — You bet.",
+      "Very American." },
+    { "Fingers crossed", "Reactions", "I'm hoping for good luck.", "Torcendo / dedos cruzados",
+      "My interview is tomorrow. Fingers crossed!", "Fingers crossed it doesn't rain.",
+      "People sometimes cross their fingers while saying it." },
+    { "Sounds good", "Reactions", "I agree with the plan.", "Fechado / beleza",
+      "— Meet at seven? — Sounds good.", "Sounds good to me!",
+      "The most common way to accept a plan." },
+    { "My bad", "Reactions", "It was my mistake (informal).", "Foi mal",
+      "Oops, my bad. I'll fix it.", "My bad, I sent the wrong file.",
+      "Only in casual situations." },
+    { "No worries", "Reactions", "It's okay; don't worry.", "Sem problemas / tranquilo",
+      "— Sorry I'm late. — No worries.", "— Thanks! — No worries.",
+      "Also a relaxed answer to \"thank you\"." },
+    { "Never mind", "Reactions", "Forget it; it isn't important.", "Deixa pra lá",
+      "Never mind, I found my keys.", "What did you say? — Never mind.",
+      "Different from \"don't worry\": it cancels what you said." },
+    { "It's no big deal", "Reactions", "It isn't important or serious.", "Não é nada demais",
+      "I forgot the snacks? It's no big deal.", "Don't worry, it's not a big deal.",
+      "Use it to calm someone down." },
+    { "I'll take your word for it", "Reactions", "I believe you without checking.", "Vou acreditar em você",
+      "The soup is too spicy? I'll take your word for it.", "Fine, I'll take your word for it.",
+      "Often a little humorous." },
+
+    -- Polite requests
+    { "Would you mind…?", "Polite requests", "A very polite way to ask for something.", "Você se importaria de…?",
+      "Would you mind closing the window?", "Would you mind if I sat here?",
+      "Followed by -ing. To say yes, answer \"Not at all\"!" },
+    { "Could you do me a favor?", "Polite requests", "Asking someone for help.", "Pode me fazer um favor?",
+      "Could you do me a favor and hold this?", "Could you do me a favor? I need a ride.",
+      "\"Do\" a favor, never \"make\" a favor." },
+    { "I was wondering if…", "Polite requests", "A very polite way to ask a question or a favor.", "Eu queria saber se…",
+      "I was wondering if you could help me.", "I was wondering if you're free on Friday.",
+      "Past tense makes it softer, not past." },
+    { "Do you happen to know…?", "Polite requests", "Asking for information in a light way.", "Por acaso você sabe…?",
+      "Do you happen to know where the station is?", "Do you happen to know her number?",
+      "Great for talking to strangers." },
+    { "Mind if I…?", "Polite requests", "Asking permission casually.", "Você se importa se eu…?",
+      "Mind if I join you?", "Mind if I open the window?",
+      "Short for \"Do you mind if I…?\"." },
+    { "Sorry to bother you", "Polite requests", "Used before interrupting someone.", "Desculpa incomodar",
+      "Sorry to bother you, but do you have a minute?", "Sorry to bother you again.",
+      "Opens almost any request politely." },
+    { "Could you say that again?", "Polite requests", "Please repeat.", "Pode repetir?",
+      "Sorry, could you say that again?", "Could you say that again, a bit slower?",
+      "Much better than \"What?\"." },
+    { "I didn't catch that", "Polite requests", "I didn't hear or understand what you said.", "Não peguei / não entendi",
+      "Sorry, I didn't catch that.", "I didn't catch your name.",
+      "Native speakers say this constantly; use it without fear." },
+    { "What's the word for…?", "Polite requests", "Asking for a word you don't remember.", "Qual é a palavra para…?",
+      "What's the word for the thing you open wine with?", "Oh, what's the word… a corkscrew!",
+      "A lifesaver: describe the thing and ask." },
+    { "What do you mean by…?", "Polite requests", "Asking someone to explain a word or idea.", "O que você quer dizer com…?",
+      "What do you mean by \"soon\"?", "What do you mean by that?",
+      "Not \"what do you want to say\"." },
+
+    -- Time and plans
+    { "In the meantime", "Time & plans", "While waiting for something else.", "Enquanto isso",
+      "The doctor is coming. In the meantime, sit down.", "Dinner's at eight. In the meantime, let's relax.",
+      "Also \"meanwhile\"." },
+    { "Sooner or later", "Time & plans", "At some time in the future; inevitably.", "Mais cedo ou mais tarde",
+      "Sooner or later, you'll have to tell him.", "Everyone makes mistakes sooner or later.",
+      "Same order as in Portuguese, easy to remember." },
+    { "Every now and then", "Time & plans", "Sometimes, but not often.", "De vez em quando",
+      "I eat fast food every now and then.", "Every now and then she calls me.",
+      "\"From time to time\" means the same." },
+    { "So far", "Time & plans", "Until now.", "Até agora",
+      "So far, so good.", "How's the new job so far?",
+      "Usually with present perfect: \"So far I've read two chapters\"." },
+    { "At the last minute", "Time & plans", "Very late; just before the deadline.", "Em cima da hora",
+      "He always does things at the last minute.", "They canceled at the last minute.",
+      "\"Last-minute\" can describe things: a last-minute trip." },
+    { "For the time being", "Time & plans", "For now; temporarily.", "Por enquanto",
+      "I'm living with my parents for the time being.", "Let's leave it like this for the time being.",
+      "A bit more formal than \"for now\"." },
+    { "Let's play it by ear", "Time & plans", "Decide as things happen, without a fixed plan.", "Vamos ver na hora",
+      "I don't know when we'll arrive. Let's play it by ear.", "No plans yet, we'll play it by ear.",
+      "Great for relaxed plans." },
+    { "Can I take a rain check?", "Time & plans", "Can we do it another time? (declining an invite)", "Fica pra próxima?",
+      "I'm exhausted tonight. Can I take a rain check?", "Rain check on lunch? Something came up.",
+      "A friendly way to say no now, yes later." },
+    { "Can you make it?", "Time & plans", "Are you able to come?", "Você consegue ir?",
+      "The party's on Saturday. Can you make it?", "Sorry, I can't make it tomorrow.",
+      "\"Make it\" also means \"succeed\": we made it!" },
+    { "Ahead of time", "Time & plans", "Before the planned time; in advance.", "Com antecedência",
+      "Let me know ahead of time if you're coming.", "We finished ahead of time.",
+      "\"In advance\" means the same." },
+    { "On time / in time", "Time & plans", "On time = at the planned time. In time = early enough.", "Pontualmente / a tempo",
+      "The train left on time.", "We got there just in time for dinner.",
+      "Two different ideas that Portuguese often mixes." },
+    { "Take your time", "Time & plans", "There's no hurry.", "Sem pressa / fique à vontade",
+      "Take your time, I'll wait.", "Take your time to decide.",
+      "Kind and polite." },
+
+    -- Idioms
+    { "Piece of cake", "Idiom", "Very easy.", "Moleza",
+      "The test was a piece of cake.", "Don't worry, it's a piece of cake.",
+      "Very common in everyday talk." },
+    { "Break the ice", "Idiom", "Make people feel relaxed when they first meet.", "Quebrar o gelo",
+      "He told a joke to break the ice.", "A quick game helps break the ice.",
+      "Same image as in Portuguese." },
+    { "Under the weather", "Idiom", "A little sick.", "Meio indisposto / meio doente",
+      "I'm feeling a bit under the weather today.", "She stayed home; she's under the weather.",
+      "Used for mild sickness, like a cold." },
+    { "Cut corners", "Idiom", "Do something badly or cheaply to save time or money.", "Fazer nas coxas / economizar onde não devia",
+      "Don't cut corners on safety.", "They cut corners and the house had problems.",
+      "Always negative." },
+    { "Once in a blue moon", "Idiom", "Very rarely.", "Muito raramente",
+      "I go to the movies once in a blue moon.", "He calls once in a blue moon.",
+      "Fun and very common." },
+    { "Beat around the bush", "Idiom", "Avoid saying the main point.", "Fazer rodeios / enrolar",
+      "Stop beating around the bush and tell me.", "I won't beat around the bush: we lost the client.",
+      "Use \"I won't beat around the bush\" before bad news." },
+    { "Hit the nail on the head", "Idiom", "Say exactly the right thing.", "Acertar em cheio",
+      "You hit the nail on the head with that comment.", "She hit the nail on the head.",
+      "A strong way to agree." },
+    { "Better late than never", "Idiom", "It's good that it happened, even if late.", "Antes tarde do que nunca",
+      "You finally called! Better late than never.", "I started learning at 40. Better late than never.",
+      "Same as the Portuguese saying." },
+    { "Keep an eye on", "Idiom", "Watch or take care of something.", "Ficar de olho em",
+      "Can you keep an eye on my bag?", "Keep an eye on the kids, please.",
+      "Very practical in daily life." },
+    { "It's not rocket science", "Idiom", "It isn't difficult.", "Não é nenhum bicho de sete cabeças",
+      "Come on, it's not rocket science.", "Cooking rice isn't rocket science.",
+      "Slightly informal." },
+    { "Up in the air", "Idiom", "Not decided yet; uncertain.", "Indefinido / em aberto",
+      "Our vacation plans are still up in the air.", "The date is up in the air.",
+      "Use for plans and decisions." },
+    { "On the bright side", "Idiom", "Looking at the positive part.", "Pelo lado bom",
+      "It rained, but on the bright side, the garden loved it.", "On the bright side, we learned a lot.",
+      "Good for staying positive in conversations." },
+    { "In a nutshell", "Idiom", "In very few words.", "Em poucas palavras",
+      "In a nutshell, the project was a success.", "That's the plan in a nutshell.",
+      "Like \"long story short\", but more neutral." },
+    { "Pull someone's leg", "Idiom", "Joke with someone by saying something untrue.", "Zoar / brincar com alguém",
+      "Relax, I'm just pulling your leg.", "Are you pulling my leg?",
+      "\"Are you kidding me?\" is similar." },
+    { "Easier said than done", "Idiom", "It sounds easy but is hard to do.", "Falar é fácil",
+      "Just relax? Easier said than done.", "Saving money is easier said than done.",
+      "Perfect answer to simple advice for a hard problem." },
+    { "Hit the road", "Idiom", "Leave; start a trip.", "Pegar a estrada / ir embora",
+      "It's late, I should hit the road.", "We hit the road at six a.m.",
+      "Casual way to say you're leaving." },
+    { "The ball is in your court", "Idiom", "It's your turn to decide or act.", "A bola está com você",
+      "I made my offer. The ball is in your court.", "Now the ball is in their court.",
+      "Common in negotiations." },
+
+    -- Feelings
+    { "I'm fed up with…", "Feelings", "I'm tired and annoyed with something.", "Estou de saco cheio de…",
+      "I'm fed up with this traffic.", "She's fed up with excuses.",
+      "Followed by a noun or -ing." },
+    { "I'm into…", "Feelings", "I really like (a hobby or topic).", "Eu curto… / estou ligado em…",
+      "I'm really into photography these days.", "What kind of music are you into?",
+      "Very natural for talking about interests." },
+    { "I can't stand…", "Feelings", "I really hate it.", "Eu não suporto…",
+      "I can't stand loud music in restaurants.", "She can't stand waiting.",
+      "Followed by a noun or -ing." },
+    { "It drives me crazy", "Feelings", "It annoys me a lot.", "Isso me deixa louco",
+      "It drives me crazy when people are late.", "That noise is driving me crazy.",
+      "Can also be positive in romance: \"you drive me crazy\"." },
+    { "I'm over the moon", "Feelings", "I'm extremely happy.", "Estou nas nuvens",
+      "She's over the moon about the baby.", "I was over the moon when I passed.",
+      "Stronger than \"very happy\"." },
+    { "Stressed out", "Feelings", "Very worried and tense.", "Estressado",
+      "I'm so stressed out about the move.", "Don't get stressed out over small things.",
+      "\"Out\" makes it stronger and more natural." },
+    { "Get on my nerves", "Feelings", "Irritate me.", "Me irritar / me tirar do sério",
+      "His jokes really get on my nerves.", "That sound is getting on my nerves.",
+      "Change the pronoun: on her nerves, on our nerves." },
+    { "I feel like…", "Feelings", "I want to (do something).", "Estou a fim de…",
+      "I feel like having pizza tonight.", "I don't feel like going out.",
+      "Followed by -ing. Not the same as \"I feel\"." },
+    { "I can't wait", "Feelings", "I'm very excited about something coming.", "Mal posso esperar",
+      "I can't wait for the weekend.", "I can't wait to see you!",
+      "\"Can't wait FOR + noun\" or \"TO + verb\"." },
+    { "It's worth it", "Feelings", "It deserves the time, money or effort.", "Vale a pena",
+      "The trip was long, but it was worth it.", "Is it worth buying the bigger one?",
+      "\"Worth + -ing\": it's worth trying." },
+    { "There's no point in…", "Feelings", "It's useless to do it.", "Não adianta…",
+      "There's no point in arguing.", "There's no point waiting, they're not coming.",
+      "Followed by -ing." },
+
+    -- Common mistakes (Brazilians)
+    { "Actually", "Common mistakes", "In fact; to correct or add information.", "Na verdade",
+      "Actually, I'm from Brazil, not Portugal.", "I thought it was hard, but actually it was easy.",
+      "False friend: \"atualmente\" is \"currently\" or \"nowadays\"." },
+    { "I'm used to…", "Common mistakes", "I'm accustomed to it.", "Estou acostumado a…",
+      "I'm used to waking up early.", "You'll get used to it.",
+      "Be used to + -ing. Different from \"I used to\" (past habit)." },
+    { "I used to…", "Common mistakes", "Something I did regularly in the past, but not anymore.", "Eu costumava…",
+      "I used to play soccer every day.", "She used to live in Rio.",
+      "Only for the past. For now, say \"I usually\"." },
+    { "Make a mistake", "Common mistakes", "Do something wrong.", "Cometer um erro",
+      "Everyone makes mistakes.", "I made a mistake in the email.",
+      "MAKE a mistake, never \"do a mistake\"." },
+    { "Have a good time", "Common mistakes", "Enjoy yourself.", "Divirta-se",
+      "Have a good time at the party!", "We had a great time.",
+      "Not \"enjoy\" alone: say \"enjoy yourself\" or \"enjoy it\"." },
+    { "Way too", "Common mistakes", "Much too; excessively.", "Demais (excessivamente)",
+      "This coffee is way too sweet.", "I ate way too much.",
+      "Informal; \"too\" already means excess, \"way\" makes it stronger." },
+    { "How long have you been…?", "Common mistakes", "Asking for the duration until now.", "Há quanto tempo você…?",
+      "How long have you been living here?", "How long have you been waiting?",
+      "Not \"how long are you living here\". Use present perfect." },
+    { "I agree", "Common mistakes", "I have the same opinion.", "Eu concordo",
+      "I agree with you.", "I don't agree with that idea.",
+      "Never \"I am agree\". Agree is a verb." },
+    { "Pretend", "Common mistakes", "Act as if something is true when it isn't.", "Fingir",
+      "He pretended to be asleep.", "Let's pretend we didn't see that.",
+      "False friend: \"pretender\" is \"intend\" or \"plan\"." },
+    { "Push / pull", "Common mistakes", "Push = move away from you. Pull = move toward you.", "Empurrar / puxar",
+      "Push the door to open it.", "Pull the chair closer.",
+      "Doors say PUSH or PULL; \"pull\" looks like \"puxe\" but don't trust it." },
 }
 
 local ARQ = DataStorage:getSettingsDir() .. "/lev_palavras.lua"
-local dados -- cache e progresso
+local dados -- progresso do quiz
 
 local function abrirDados()
     if not dados then dados = LuaSettings:open(ARQ) end
@@ -147,62 +468,15 @@ local function indiceDoDia(desloc)
     local t = os.time() + (desloc or 0) * 86400
     local d = os.date("*t", t)
     local seq = d.year * 366 + d.yday
-    return (seq % #PALAVRAS) + 1, t
+    return (seq % #EXPRESSOES) + 1, t
 end
 
 local function entrada(i)
-    local p = PALAVRAS[i]
-    local e = { palavra = p[1], classe = p[2], definicao = p[3], exemplo = p[4] }
-    local cache = abrirDados():readSetting("dic") or {}
-    local c = cache[p[1]]
-    if type(c) == "table" then
-        e.fonetica, e.extras, e.sinonimos = c.fonetica, c.extras, c.sinonimos
-    end
-    return e
-end
-
--- busca no Free Dictionary API (com Wi-Fi) e guarda no cache
-local function buscarDicionario(palavra)
-    local cache = abrirDados():readSetting("dic") or {}
-    if cache[palavra] then return true end
-    local ok_http, http = pcall(require, "socket.http")
-    local ok_ltn, ltn12 = pcall(require, "ltn12")
-    local ok_su, socketutil = pcall(require, "socketutil")
-    if not (ok_http and ok_ltn) then return false end
-    local partes = {}
-    if ok_su then socketutil:set_timeout(6, 10) end
-    local ok, _, codigo = pcall(http.request, {
-        url = "https://api.dictionaryapi.dev/api/v2/entries/en/" .. palavra,
-        sink = ltn12.sink.table(partes),
-        headers = { ["User-Agent"] = "KOReader-Lev" },
-    })
-    if ok_su then socketutil:reset_timeout() end
-    if not ok or codigo ~= 200 then return false end
-    local ok_j, j = pcall(require("json").decode, table.concat(partes))
-    if not ok_j or type(j) ~= "table" or type(j[1]) ~= "table" then return false end
-    local r = { extras = {}, sinonimos = {} }
-    local vistos = {}
-    for _, ent in ipairs(j) do
-        r.fonetica = r.fonetica or ent.phonetic
-        for _, ph in ipairs(ent.phonetics or {}) do r.fonetica = r.fonetica or ph.text end
-        for _, m in ipairs(ent.meanings or {}) do
-            for _, d in ipairs(m.definitions or {}) do
-                if #r.extras < 4 and d.definition then
-                    table.insert(r.extras, { classe = m.partOfSpeech, definicao = d.definition, exemplo = d.example })
-                end
-                for _, s in ipairs(d.synonyms or {}) do
-                    if not vistos[s] and #r.sinonimos < 8 then vistos[s] = true; table.insert(r.sinonimos, s) end
-                end
-            end
-            for _, s in ipairs(m.synonyms or {}) do
-                if not vistos[s] and #r.sinonimos < 8 then vistos[s] = true; table.insert(r.sinonimos, s) end
-            end
-        end
-    end
-    cache[palavra] = r
-    abrirDados():saveSetting("dic", cache)
-    abrirDados():flush()
-    return true
+    local p = EXPRESSOES[i]
+    return {
+        palavra = p[1], classe = p[2], definicao = p[3], pt = p[4],
+        exemplos = { p[5], p[6] }, dica = p[7],
+    }
 end
 
 -- ---------- tela de estudo ----------
@@ -222,7 +496,8 @@ end
 local function caixa(t, tam, cor, largura, opts)
     opts = opts or {}
     return TextBoxWidget:new{ text = t or "", face = opts.face or face(tam), fgcolor = cor or PRETO,
-        width = largura, alignment = opts.alinhamento or "left", bold = opts.negrito }
+        width = largura, alignment = opts.alinhamento or "left", bold = opts.negrito,
+        bgcolor = opts.fundo or BRANCO }
 end
 
 local TelaPalavra = InputContainer:extend{
@@ -258,35 +533,30 @@ function TelaPalavra:montarPalavra(W)
     local e = entrada(i)
     local m = Screen:scaleBySize(28)
     local larg = W - 2 * m
+    local esp = function(n) return VerticalSpan:new{ width = Screen:scaleBySize(n) } end
     local g = VerticalGroup:new{ align = "left" }
-    local quando = self.desloc == 0 and "Word of the day" or os.date("Word of %b %d", t)
-    table.insert(g, TextWidget:new{ text = quando, face = face(15), fgcolor = CINZA })
-    table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(10) })
-    table.insert(g, caixa(e.palavra, 40, PRETO, larg, { face = face(40, true) }))
-    local linha = e.classe .. (e.fonetica and ("   " .. e.fonetica) or "")
-    table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(4) })
-    table.insert(g, caixa(linha, 17, CINZA, larg))
-    table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(18) })
+    local quando = self.desloc == 0 and "Expression of the day" or os.date("Expression of %b %d", t)
+    table.insert(g, TextWidget:new{ text = quando .. "  ·  " .. e.classe, face = face(15), fgcolor = CINZA })
+    table.insert(g, esp(10))
+    table.insert(g, caixa(e.palavra, 34, PRETO, larg, { face = face(34, true) }))
+    table.insert(g, esp(14))
     table.insert(g, caixa(e.definicao, 21, PRETO, larg))
-    table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(8) })
-    table.insert(g, caixa("“" .. e.exemplo .. "”", 18, CINZA, larg, { face = face(18) }))
-    -- definicoes extras do dicionario (quando ja baixadas)
-    for n, x in ipairs(e.extras or {}) do
-        if n > 2 then break end
-        if x.definicao and x.definicao ~= e.definicao then
-            table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(14) })
-            table.insert(g, caixa((x.classe and (x.classe .. " · ") or "") .. x.definicao, 16, PRETO, larg))
-            if x.exemplo then
-                table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(4) })
-                table.insert(g, caixa("“" .. x.exemplo .. "”", 15, CINZA, larg))
-            end
-        end
+    table.insert(g, esp(8))
+    table.insert(g, caixa("In Portuguese: " .. e.pt, 17, CINZA, larg))
+    table.insert(g, esp(18))
+    for _, ex in ipairs(e.exemplos) do
+        table.insert(g, caixa("“" .. ex .. "”", 18, PRETO, larg, { face = face(18) }))
+        table.insert(g, esp(8))
     end
-    if e.sinonimos and #e.sinonimos > 0 then
-        table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(14) })
-        table.insert(g, caixa("Synonyms: " .. table.concat(e.sinonimos, ", "), 15, CINZA, larg))
+    if e.dica and e.dica ~= "" then
+        table.insert(g, esp(8))
+        table.insert(g, FrameContainer:new{
+            bordersize = Screen:scaleBySize(1), color = CLARO, background = BRANCO,
+            radius = Screen:scaleBySize(10), padding = Screen:scaleBySize(12), width = larg,
+            caixa("Tip: " .. e.dica, 16, CINZA, larg - Screen:scaleBySize(26)),
+        })
     end
-    table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(24) })
+    table.insert(g, esp(22))
     table.insert(g, HorizontalGroup:new{ align = "center",
         self:botao("‹ Previous", function() self:ir(-1) end),
         HorizontalSpan:new{ width = Screen:scaleBySize(10) },
@@ -299,24 +569,28 @@ function TelaPalavra:montarPalavra(W)
     return FrameContainer:new{ bordersize = 0, padding = m, padding_top = Screen:scaleBySize(30), background = BRANCO, g }
 end
 
--- quiz: qual e o significado? (4 opcoes, palavras recentes)
+-- quiz: alterna "o que significa?" (opcoes em ingles) e "como se diz em ingles?" (mostra o portugues)
+local semente = os.time()
+local function aleatorio(n)
+    semente = (semente * 1103515245 + 12345) % 2147483648
+    return (semente % n) + 1
+end
+
 function TelaPalavra:abrirQuiz()
     local i = indiceDoDia(self.desloc)
-    local certo = PALAVRAS[i]
+    local certo = EXPRESSOES[i]
     local opcoes = { certo }
     local usados = { [i] = true }
-    local semente = os.time()
     while #opcoes < 4 do
-        semente = (semente * 1103515245 + 12345) % 2147483648
-        local j = (semente % #PALAVRAS) + 1
-        if not usados[j] then usados[j] = true; table.insert(opcoes, PALAVRAS[j]) end
+        local j = aleatorio(#EXPRESSOES)
+        if not usados[j] then usados[j] = true; table.insert(opcoes, EXPRESSOES[j]) end
     end
     for k = #opcoes, 2, -1 do -- embaralha
-        semente = (semente * 1103515245 + 12345) % 2147483648
-        local r = (semente % k) + 1
+        local r = aleatorio(k)
         opcoes[k], opcoes[r] = opcoes[r], opcoes[k]
     end
-    self.quiz = { certo = certo, opcoes = opcoes, resposta = nil }
+    local tipo = (aleatorio(2) == 1) and "significado" or "traducao"
+    self.quiz = { certo = certo, opcoes = opcoes, resposta = nil, tipo = tipo }
     self.modo = "quiz"
     self:redesenhar()
 end
@@ -326,9 +600,12 @@ function TelaPalavra:montarQuiz(W)
     local m = Screen:scaleBySize(28)
     local larg = W - 2 * m
     local g = VerticalGroup:new{ align = "left" }
-    table.insert(g, TextWidget:new{ text = "Quiz · what does it mean?", face = face(15), fgcolor = CINZA })
+    local traducao = q.tipo == "traducao"
+    table.insert(g, TextWidget:new{ text = traducao and "Quiz · how do you say it in English?" or "Quiz · what does it mean?",
+        face = face(15), fgcolor = CINZA })
     table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(10) })
-    table.insert(g, caixa(q.certo[1], 36, PRETO, larg, { face = face(36, true) }))
+    local pergunta = traducao and q.certo[4] or q.certo[1]
+    table.insert(g, caixa(pergunta, 30, PRETO, larg, { face = face(30, true) }))
     table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(18) })
     for _, op in ipairs(q.opcoes) do
         local marcado = q.resposta ~= nil
@@ -337,12 +614,12 @@ function TelaPalavra:montarQuiz(W)
         local fundo = (marcado and e_certo) and PRETO or BRANCO
         local cor = (marcado and e_certo) and BRANCO or PRETO
         local prefixo = marcado and (e_certo and "✓  " or (escolhido and "✗  " or "")) or ""
+        local texto = traducao and op[1] or op[3]
         local f = FrameContainer:new{
             bordersize = Screen:scaleBySize(1), color = escolhido and PRETO or CLARO, background = fundo,
             radius = Screen:scaleBySize(10), padding = Screen:scaleBySize(12), width = larg,
-            caixa(prefixo .. op[3], 17, cor, larg - Screen:scaleBySize(26), { }),
+            caixa(prefixo .. texto, 17, cor, larg - Screen:scaleBySize(26), { fundo = fundo }),
         }
-        f[1].bgcolor = fundo
         table.insert(self.alvos, { w = f, acao = function()
             if not q.resposta then
                 q.resposta = op
@@ -357,13 +634,17 @@ function TelaPalavra:montarQuiz(W)
         table.insert(g, f)
         table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(8) })
     end
+    if q.resposta then -- depois de responder, mostra o exemplo para fixar
+        table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(4) })
+        table.insert(g, caixa(q.certo[1] .. " = " .. q.certo[4] .. "\n“" .. q.certo[5] .. "”", 16, CINZA, larg))
+    end
     local acertos = abrirDados():readSetting("acertos") or 0
     local tentativas = abrirDados():readSetting("tentativas") or 0
     table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(10) })
     table.insert(g, TextWidget:new{ text = string.format("Score: %d of %d", acertos, tentativas), face = face(14), fgcolor = CINZA })
     table.insert(g, VerticalSpan:new{ width = Screen:scaleBySize(16) })
     table.insert(g, HorizontalGroup:new{ align = "center",
-        self:botao("‹ Back to word", function() self.modo = "palavra"; self:redesenhar() end),
+        self:botao("‹ Back", function() self.modo = "palavra"; self:redesenhar() end),
         HorizontalSpan:new{ width = Screen:scaleBySize(10) },
         self:botao("Another", function() self:abrirQuizAleatorio() end),
     })
@@ -371,7 +652,7 @@ function TelaPalavra:montarQuiz(W)
 end
 
 function TelaPalavra:abrirQuizAleatorio()
-    self.desloc = -((os.time() % 20) + 1) -- uma das ultimas ~20 palavras
+    self.desloc = -(aleatorio(30) - 1) -- hoje ou uma das ultimas ~30 expressoes
     self:abrirQuiz()
 end
 
@@ -390,15 +671,7 @@ end
 function TelaPalavra:ir(delta)
     self.desloc = math.min(0, self.desloc + delta)
     self.modo = "palavra"
-    local i = indiceDoDia(self.desloc)
-    local M = rawget(_G, "__LEV_MODAL")
-    local palavra = PALAVRAS[i][1]
-    local cache = abrirDados():readSetting("dic") or {}
-    if M and not cache[palavra] then
-        M.durante("Loading…", function() pcall(buscarDicionario, palavra); self:redesenhar() end)
-    else
-        self:redesenhar()
-    end
+    self:redesenhar()
 end
 
 function TelaPalavra:onTapTela(_, ges)
@@ -430,21 +703,18 @@ end
 function TelaPalavra:onCloseWidget() self._fechada = true end
 
 -- ---------- API para o cartao do Inicio ----------
-local P = {}
+local P = { rotulo = "Expression of the day" }
 function P.hoje()
     return entrada((indiceDoDia(0)))
 end
 function P.abrir()
     local M = rawget(_G, "__LEV_MODAL")
     local function mostrar()
-        pcall(buscarDicionario, P.hoje().palavra) -- pronuncia e extras (se houver Wi-Fi)
         local tela = TelaPalavra:new{}
         UIManager:show(tela, "ui", tela.dimen)
     end
     if M and M.durante then M.durante("Loading…", mostrar) else mostrar() end
 end
--- pre-busca silenciosa da palavra do dia (para abrir rapido e funcionar offline)
-UIManager:scheduleIn(30, function() pcall(buscarDicionario, P.hoje().palavra) end)
 _G.__LEV_PALAVRA = P
 
-logger.info("Lev: Word of the day ativo,", #PALAVRAS, "palavras")
+logger.info("Lev: Expression of the day ativo,", #EXPRESSOES, "expressoes")
