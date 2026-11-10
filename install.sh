@@ -107,6 +107,10 @@ if [ -n "${LEV_NAME:-}" ]; then
   lev "cat > /tmp/lev_name.lua && cd $KO && ./luajit /tmp/lev_name.lua >/dev/null 2>&1; rm -f /tmp/lev_name.lua" < "$STAGE/name.lua"
 fi
 
+echo "==> Quick settings button (Auto night)"
+lev "cat > /tmp/qs_button.lua" < "$HERE/tools/quick_settings_button.lua"
+lev "cd $KO && ./luajit /tmp/qs_button.lua 2>/dev/null | grep -v '^ffi'; rm -f /tmp/qs_button.lua"
+
 echo "==> Restarting KOReader"
 # kill -9 so KOReader does not overwrite settings.reader.lua on exit; koreader.sh relaunches it
 lev "kill -9 \$(pidof luajit) 2>/dev/null; true"
