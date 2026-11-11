@@ -1,5 +1,5 @@
--- Lev Neo (2026-11-11): Inicio 10 px mais baixo.
--- A tela do Lev tem uma linha morta perto do topo; descer o Inicio 10 px tira o texto de
+-- Lev Neo (2026-11-11): Inicio 13 px mais baixo.
+-- A tela do Lev tem uma linha morta perto do topo; descer o Inicio 13 px tira o texto de
 -- cima dela.
 -- Como: quando o ZenOS monta o corpo do Inicio na tela (StandalonePage.mount_body), o
 -- bloco inteiro ganha 10 px em cima. Tudo desce junto, entao espacos, faixas e areas de
@@ -8,7 +8,7 @@
 local userpatch = require("userpatch")
 local logger = require("logger")
 
-local DESCER = 10
+local DESCER = 13
 
 userpatch.registerPatchPluginFunc("zenos", function()
     local ok, Pagina = pcall(require, "modules/filebrowser/patches/standalone_page")

@@ -48,25 +48,42 @@ userpatch.registerPatchPluginFunc("zenos", function()
                 and getmetatable(w[1]) == HorizontalGroup and w.dimen and w.dimen.w
                 and w.dimen.w > Screen:getWidth() * 0.6 then
             -- fileira de capas: a esquerda e com espacamento curto (qualquer numero de livros)
+            local mudou = mt ~= LeftContainer
             setmetatable(w, LeftContainer)
             local fileira = w[1]
             for i = 1, #fileira do
-                if getmetatable(fileira[i]) == HorizontalSpan then fileira[i].width = ESPACO end
+                if getmetatable(fileira[i]) == HorizontalSpan and fileira[i].width ~= ESPACO then
+                    fileira[i].width = ESPACO
+                    mudou = true
+                end
             end
-            if fileira.resetLayout then fileira:resetLayout() end
-            trocas = trocas + 1
-            logger.info("Lev faixa: fileira", getmetatable(w) == LeftContainer and "esq" or "?", "itens", #fileira,
-                "largura", fileira:getSize().w, "de", w.dimen.w)
+            if mudou then
+                if fileira.resetLayout then fileira:resetLayout() end
+                trocas = trocas + 1
+            end
         end
         for i = 1, #w do alinharEsquerda(w[i], prof + 1) end
     end
 
+    -- v2: a faixa guarda paginas prontas e as refaz por dentro (capa que termina de
+    -- carregar, troca de pagina) sem passar por build. Por isso o ajuste roda tambem a
+    -- cada desenho da faixa, antes de pintar.
     local build = comp.build
     comp.build = function(ctx, ...)
         local w = build(ctxAjustado(ctx), ...)
         trocas = 0
         local ok, err = pcall(alinharEsquerda, w, 0)
         logger.dbg("Lev faixa: fileiras alinhadas a esquerda:", trocas, ok and "" or err)
+        if type(w) == "table" and type(w.paintTo) == "function" and not w._lev_pinta then
+            w._lev_pinta = true
+            local pintar = w.paintTo
+            w.paintTo = function(self, bb, x, y, ...)
+                trocas = 0
+                pcall(alinharEsquerda, self, 0)
+                if trocas > 0 then logger.dbg("Lev faixa: realinhada ao desenhar:", trocas) end
+                return pintar(self, bb, x, y, ...)
+            end
+        end
         return w
     end
     if type(comp.preferredHeight) == "function" then
