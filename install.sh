@@ -45,7 +45,8 @@ mkdir -p "$STAGE/ko/patches" "$STAGE/ko/plugins" "$STAGE/ko/icons"
 cp "$HERE"/patches/*.lua "$STAGE/ko/patches/"
 cp -R "$HERE/plugins/spotify.koplugin" "$STAGE/ko/plugins/"
 cp "$HERE"/icons/*.svg "$HERE"/icons/spotify/*.png "$STAGE/ko/icons/"
-(cd "$STAGE/ko" && tar -cf "$STAGE/ko.tar" patches plugins icons)
+cp "$HERE"/bin/lev_baixar_jornal.lua "$STAGE/ko/"
+(cd "$STAGE/ko" && tar -cf "$STAGE/ko.tar" patches plugins icons lev_baixar_jornal.lua)
 send_tar "$STAGE/ko.tar" "$KO"
 
 if [ "$DOWNLOADS" = 1 ]; then

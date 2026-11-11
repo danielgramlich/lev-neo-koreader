@@ -1,10 +1,10 @@
--- Lev Neo (2026-11-06): jornal da manha automatico (the news), v3.
--- * v3: ao tocar no botao the news, tenta baixar a edicao mais recente em segundo
---   plano (processo separado, sem travar a tela); avisa so se chegar edicao nova.
--- * Uma vez por dia, a partir das 6h10, fora de um livro e com Wi-Fi, baixa as
---   edicoes do feed (lista em /mnt/fat/feed_config.lua) para /mnt/fat/the news.
--- * Durante o download mostra so uma caixinha com a logo e "baixando…"
---   (os avisos do baixador de noticias ficam silenciados).
+-- Lev Neo (2026-11-06; v4 2026-11-11): the news automatico.
+-- * Todo toque na aba the news procura e baixa a edicao mais recente em segundo plano;
+--   avisa so se chegar edicao nova.
+-- * Alem disso, de hora em hora a partir das 6h10 (com Wi-Fi) procura sozinho, o que
+--   pega as edicoes da manha e da noite. Feed em /mnt/fat/feed_config.lua.
+-- * v4: o download roda no baixador leve koreader/lev_baixar_jornal.lua (processo novo,
+--   ~90 MB), e nao mais num fork do KOReader, que estourava a memoria em edicoes grandes.
 -- * Cada edicao ganha capa (logo), autor "the news", serie "the news" e titulo
 --   "Manha · 6 de nov." / "Noite · 5 de nov.".
 -- * Apaga as edicoes com mais de 24 h (pela data da edicao).
@@ -126,69 +126,6 @@ local function limparAntigas()
     return #apagar
 end
 
--- ---------- caixinha "baixando" com a logo ----------
-local function mostrarCaixa()
-    -- padrao do Lev: o mesmo modal central de carregamento (2-abrindo-lev.lua)
-    local M = rawget(_G, "__LEV_MODAL")
-    if M then return M.mostrar("Downloading the news…") end
-    local Blitbuffer = require("ffi/blitbuffer")
-    local CenterContainer = require("ui/widget/container/centercontainer")
-    local FrameContainer = require("ui/widget/container/framecontainer")
-    local VerticalGroup = require("ui/widget/verticalgroup")
-    local VerticalSpan = require("ui/widget/verticalspan")
-    local ImageWidget = require("ui/widget/imagewidget")
-    local TextWidget = require("ui/widget/textwidget")
-    local Font = require("ui/font")
-    local Size = require("ui/size")
-    local Screen = require("device").screen
-    local largura = Screen:scaleBySize(190)
-    local conteudo = VerticalGroup:new{ align = "center" }
-    if lfs.attributes(LOGO, "mode") == "file" then
-        table.insert(conteudo, ImageWidget:new{
-            file = LOGO, width = largura, height = math.floor(largura * 63 / 360), scale_factor = 0,
-        })
-        table.insert(conteudo, VerticalSpan:new{ width = Size.span.vertical_large })
-    end
-    table.insert(conteudo, TextWidget:new{ text = "Downloading…", face = Font:getFace("cfont", 16) })
-    local caixa = CenterContainer:new{
-        dimen = Screen:getSize(),
-        FrameContainer:new{
-            background = Blitbuffer.COLOR_WHITE,
-            bordersize = Size.border.thin,
-            radius = Size.radius.window,
-            padding = Size.padding.large,
-            conteudo,
-        },
-    }
-    UIManager:show(caixa)
-    UIManager:forceRePaint()
-    return caixa
-end
-
-local function baixarSilencioso(nd)
-    local Trapper = require("ui/trapper")
-    local caixa = mostrarCaixa()
-    Trapper:wrap(function()
-        local o_info, o_confirm, o_clear, o_reset = Trapper.info, Trapper.confirm, Trapper.clear, Trapper.reset
-        Trapper.info = function() return true end
-        Trapper.confirm = function() return false end
-        Trapper.clear = function() end
-        Trapper.reset = function() end
-        local ok, err = pcall(nd.loadConfigAndProcessFeeds, nd)
-        Trapper.info, Trapper.confirm, Trapper.clear, Trapper.reset = o_info, o_confirm, o_clear, o_reset
-        UIManager:close(caixa)
-        if not ok then logger.warn("Lev jornal: erro no download:", err) end
-        local n = marcarEdicoes()
-        logger.info("Lev jornal: download terminado; edicoes marcadas:", n)
-        pcall(limparAntigas) -- so a edicao nova fica
-        local FileManager = require("apps/filemanager/filemanager")
-        if FileManager.instance and FileManager.instance.onRefresh then
-            pcall(FileManager.instance.onRefresh, FileManager.instance)
-        end
-        UIManager:setDirty(nil, "full")
-    end)
-end
-
 -- ---------- quando baixar ----------
 -- Wi-Fi com endereco IP? (o estado interno do KOReader pode estar desatualizado
 -- logo apos reiniciar, entao tambem conferimos a interface direto)
@@ -202,22 +139,16 @@ local function temRede(NetworkMgr)
     return s:match("inet addr:%d") ~= nil
 end
 
--- ---------- download em segundo plano (botao the news) ----------
--- Roda o baixador num processo separado (fork): a tela continua livre (lendo a
--- edicao que ja existe). No fim, marca capa/titulo e avisa se chegou edicao nova.
-local fundo = { pid = nil }
-
-local function pegarBaixador()
-    local FileManager = require("apps/filemanager/filemanager")
-    local fm = FileManager.instance
-    local ok_pl, PluginLoader = pcall(require, "pluginloader")
-    local nd = (fm and fm.newsdownloader)
-        or (ok_pl and PluginLoader.getPluginInstance and PluginLoader:getPluginInstance("newsdownloader"))
-    if not nd or not nd.loadConfigAndProcessFeeds then return nil end
-    if nd.lazyInitialization then nd:lazyInitialization() end
-    if not nd.feed_config_path then return nil end
-    return nd
-end
+-- ---------- download em segundo plano ----------
+-- Roda o baixador leve (koreader/lev_baixar_jornal.lua) como processo novo, sem copiar o
+-- KOReader inteiro: o fork antigo (~220 MB) era morto por falta de memoria em edicoes
+-- grandes e deixava o .epub.tmp pela metade. A tela continua livre; no fim, marca
+-- capa/titulo, guarda so a edicao mais nova e avisa se chegou edicao nova.
+local BAIXADOR = "/mnt/fat/koreader/lev_baixar_jornal.lua"
+local FEITO = "/tmp/lev_jornal.feito"
+local SAIDA = "/tmp/lev_jornal.log"
+local LIMITE = 6 * 60 -- segundos ate desistir
+local fundo = { ativo = false }
 
 local function edicoesAtuais()
     local t = {}
@@ -229,41 +160,61 @@ local function edicoesAtuais()
     return t
 end
 
+local function limparTemporarios()
+    if lfs.attributes(PASTA, "mode") ~= "directory" then return end
+    for nome in lfs.dir(PASTA) do
+        if nome:match("%.tmp$") then os.remove(PASTA .. "/" .. nome) end
+    end
+end
+
+local function edicaoMaisNova()
+    local melhor, idade
+    for nome in pairs(edicoesAtuais()) do
+        local caminho = PASTA .. "/" .. nome
+        local i = idadeEdicao(nome, caminho)
+        if not idade or i < idade then melhor, idade = caminho, i end
+    end
+    return melhor
+end
+
+local function pararBaixador()
+    os.execute("for p in ; do kill ; done")
+end
+
 local function baixarEmSegundoPlano()
-    if fundo.pid then return "ja baixando" end
+    if fundo.ativo then return "ja baixando" end
     local NetworkMgr = require("ui/network/manager")
     if not temRede(NetworkMgr) then return "sem Wi-Fi" end
-    local nd = pegarBaixador()
-    if not nd then return "plugin de noticias nao encontrado" end
-    local ffiutil = require("ffi/util")
+    if lfs.attributes(BAIXADOR, "mode") ~= "file" then return "baixador nao encontrado" end
+    limparTemporarios()
     local antes = edicoesAtuais()
-    local pid = ffiutil.runInSubProcess(function()
-        -- processo filho: nada de desenhar na tela
-        local nada = function() end
-        UIManager.show, UIManager.forceRePaint, UIManager.setDirty = nada, nada, nada
-        pcall(nd.loadConfigAndProcessFeeds, nd)
-    end)
-    if not pid then return "nao consegui iniciar o download" end
-    fundo.pid, fundo.inicio = pid, os.time()
+    os.remove(FEITO)
+    G_reader_settings:saveSetting("lev_jornal_ultima_busca", os.time())
+    os.execute(string.format(
+        "cd /mnt/fat/koreader && (./luajit %s /mnt/fat/ /mnt/fat/feed_config.lua > %s 2>&1; echo 0 > %s) &",
+        BAIXADOR, SAIDA, FEITO))
+    fundo.ativo, fundo.inicio = true, os.time()
     local function conferir()
-        if not fundo.pid then return end
-        if not ffiutil.isSubProcessDone(fundo.pid) then
-            if os.time() - fundo.inicio > 240 then -- 4 min: desiste
-                pcall(ffiutil.terminateSubProcess, fundo.pid)
-                logger.warn("Lev jornal: download em segundo plano demorou demais; cancelado")
-                fundo.pid = nil
+        if not fundo.ativo then return end
+        if lfs.attributes(FEITO, "mode") ~= "file" then
+            if os.time() - fundo.inicio > LIMITE then
+                pararBaixador()
+                limparTemporarios()
+                fundo.ativo = false
+                logger.warn("Lev jornal: download demorou demais; cancelado")
             else
                 UIManager:scheduleIn(3, conferir)
             end
             return
         end
-        fundo.pid = nil
+        fundo.ativo = false
+        local f = io.open(FEITO); local codigo = f and f:read("*l"); if f then f:close() end
         local ok_m, n = pcall(marcarEdicoes)
         local novas = 0
         for nome in pairs(edicoesAtuais()) do
             if not antes[nome] then novas = novas + 1 end
         end
-        logger.info("Lev jornal: segundo plano terminou; novas:", novas, "marcadas:", ok_m and n or n)
+        logger.info("Lev jornal: segundo plano terminou; codigo:", codigo, "novas:", novas, "marcadas:", ok_m and n or n)
         if novas > 0 then
             pcall(limparAntigas) -- so a edicao nova fica
             G_reader_settings:saveSetting("lev_jornal_ultimo", hoje())
@@ -271,9 +222,26 @@ local function baixarEmSegundoPlano()
             if FileManager.instance and FileManager.instance.onRefresh then
                 pcall(FileManager.instance.onRefresh, FileManager.instance)
             end
-            local ok_n, Notification = pcall(require, "ui/widget/notification")
-            if ok_n and Notification then
-                Notification:notify("New the news edition available", Notification.SOURCE_ALWAYS_SHOW)
+            -- lendo a edicao antiga agora? pergunta se quer abrir a nova (troca na hora)
+            local ReaderUI = require("apps/reader/readerui")
+            local leitor = ReaderUI.instance
+            local aberto = leitor and leitor.document and leitor.document.file
+            local nova = edicaoMaisNova()
+            if aberto and nova and aberto ~= nova and aberto:sub(1, #PASTA) == PASTA then
+                local ConfirmBox = require("ui/widget/confirmbox")
+                UIManager:show(ConfirmBox:new{
+                    text = "A new edition of the news is ready.",
+                    ok_text = "Open", cancel_text = "Later",
+                    ok_callback = function()
+                        if ReaderUI.instance then ReaderUI.instance:switchDocument(nova) end
+                        UIManager:scheduleIn(8, function() pcall(limparAntigas) end)
+                    end,
+                })
+            else
+                local ok_n, Notification = pcall(require, "ui/widget/notification")
+                if ok_n and Notification then
+                    Notification:notify("New the news edition available", Notification.SOURCE_ALWAYS_SHOW)
+                end
             end
         end
     end
@@ -288,32 +256,11 @@ _G.__LEV_JORNAL_SEGUNDO_PLANO = function()
 end
 
 local function verificar()
-    if G_reader_settings:readSetting("lev_jornal_ultimo") == hoje() then
-        return "ja baixado hoje"
-    end
+    local ultima = tonumber(G_reader_settings:readSetting("lev_jornal_ultima_busca")) or 0
+    if os.time() - ultima < 60 * 60 then return "buscou ha menos de 1 h" end
     local t = os.date("*t")
     if t.hour * 60 + t.min < INICIO then return "antes das 6h10" end
-    local NetworkMgr = require("ui/network/manager")
-    if not temRede(NetworkMgr) then return "sem Wi-Fi" end
-    local ReaderUI = require("apps/reader/readerui")
-    if ReaderUI.instance then return "livro aberto" end
-    local FileManager = require("apps/filemanager/filemanager")
-    local fm = FileManager.instance
-    if not fm then return "biblioteca nao carregada" end
-    -- o KOReader registra o plugin pelo nome da pasta (newsdownloader.koplugin)
-    local ok_pl, PluginLoader = pcall(require, "pluginloader")
-    local nd = fm.newsdownloader
-        or (ok_pl and PluginLoader.getPluginInstance and PluginLoader:getPluginInstance("newsdownloader"))
-    if not nd or not nd.loadConfigAndProcessFeeds then
-        return "plugin de noticias nao encontrado"
-    end
-    -- o plugin so define a pasta e o feed_config.lua na inicializacao "preguicosa",
-    -- que normalmente roda ao abrir o menu dele; sem isso o caminho fica vazio
-    if nd.lazyInitialization then nd:lazyInitialization() end
-    if not nd.feed_config_path then return "plugin de noticias sem configuracao" end
-    G_reader_settings:saveSetting("lev_jornal_ultimo", hoje())
-    baixarSilencioso(nd)
-    return "baixando o jornal do dia"
+    return baixarEmSegundoPlano()
 end
 
 local function ciclo()
@@ -338,4 +285,4 @@ UIManager:scheduleIn(20, function()
     end
 end)
 UIManager:scheduleIn(40, ciclo)
-logger.info("Lev: jornal automatico ativo (v3)")
+logger.info("Lev: jornal automatico ativo (v4)")

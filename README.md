@@ -38,7 +38,8 @@ Lua user patches, a Spotify plugin, an English-learning screen and a home-grown 
 | `patches/2-brilho-ui-lev.lua` | Brightness control redesigned for an imprecise touchscreen: 8 steps, round −/+ buttons, half-row tap zones. |
 | `patches/2-luz-lev.lua` | Frontlight fixes: gamma curve and a "kick" that unfreezes the PWM after the light was off or the device slept. |
 | `patches/2-barra-leitor-lev.lua` | Keeps the ZenOS bottom bar visible while reading the newsletter, without covering text. |
-| `patches/2-jornal-lev.lua` | Daily newsletter (RSS via KOReader's News Downloader) fetched in the background; only the latest edition is kept. |
+| `patches/2-jornal-lev.lua` | Newsletter (RSS via KOReader's News Downloader): every tap on the news tab, and hourly from 06:10, looks for the latest edition in the background; only the latest is kept. If a new edition arrives while you read the old one, it offers to open it. |
+| `bin/lev_baixar_jornal.lua` | Lightweight headless downloader used by the patch (installed to the KOReader folder). Runs the News Downloader backend as a fresh process (~90 MB peak) instead of forking KOReader, which ran out of memory on large editions. Use `limit = 1` in `feed_config.lua`. |
 | `patches/2-ajustes-lev.lua` | Bottom-bar tabs for the newsletter and Settings. |
 | `patches/2-capas-lev.lua` | Applies custom covers dropped in `koreader/capas_lev/` and makes the lock screen fill the panel (Kindle-style crop, no stretching). |
 | `patches/2-metadados-lev.lua` | Title/author from the file name (`Title - Author`) and optional clean descriptions. |
