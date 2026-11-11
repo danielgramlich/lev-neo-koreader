@@ -6,6 +6,7 @@
 -- v2: velocidade maxima sempre que ha toque, botao ou algo para desenhar (antes de
 -- desenhar), e 60 MHz so depois de 8 s sem nada acontecendo.
 -- O tempo para dormir sozinho fica em settings.reader.lua (auto_suspend_timeout_seconds).
+-- v3: dorme e acorda em velocidade maxima (com 60 MHz o Lev chegou a reiniciar ao acordar).
 -- Para desfazer: apague este arquivo (o lancador volta a usar 1 GHz fixo no proximo inicio).
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
@@ -70,12 +71,33 @@ function UIManager:forceRePaint(...)
     return forcarOriginal(self, ...)
 end
 
--- ao acordar: o modo manual pode ter sido trocado; reaplica e fica rapido
+-- dormir e acordar SEMPRE em velocidade maxima, no modo original ("performance"):
+-- dormir com o processador a 60 MHz pode fazer o Lev reiniciar em vez de acordar.
 local Device = require("device")
+if Device.suspend then
+    local dormirOriginal = Device.suspend
+    Device.suspend = function(...)
+        ativo = false
+        escrever("scaling_governor", "performance")
+        estado = nil
+        logger.info("Lev energia: velocidade maxima para dormir")
+        return dormirOriginal(...)
+    end
+end
 if Device.resume then
     local acordarOriginal = Device.resume
     Device.resume = function(...)
-        if ativo then escrever("scaling_governor", "userspace"); estado = nil; atividade() end
-        return acordarOriginal(...)
+        local r = { acordarOriginal(...) }
+        -- volta ao modo economico alguns segundos depois de acordar
+        UIManager:scheduleIn(5, function()
+            if escrever("scaling_governor", "userspace") then
+                ativo = true
+                estado = nil
+                atividade()
+                velocidade(RAPIDO)
+                logger.info("Lev energia: modo economico de volta apos acordar")
+            end
+        end)
+        return unpack(r)
     end
 end
