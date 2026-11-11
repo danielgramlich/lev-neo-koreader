@@ -2,7 +2,7 @@
 -- Esconde a barra de abas do menu (icones de ajustes rapidos, apps, engrenagem e Inicio):
 -- ela deixa de ser desenhada e nao ocupa espaco. O menu sempre abre nos Ajustes rapidos.
 -- Inicio, Biblioteca e Ajustes continuam na barra de baixo do Lev.
--- Tambem sobe 2 px a linha de hora, Wi-Fi e bateria.
+-- Tambem sobe 2 px a linha de hora, Wi-Fi e bateria, e deixa a borda do menu fina (1 px cinza).
 -- Para desfazer: apague este arquivo (koreader/patches/2-menu-lev.lua).
 local Geom = require("ui/geometry")
 local TouchMenu = require("ui/widget/touchmenu")
@@ -48,6 +48,12 @@ function TouchMenu:init(...)
         return unpack(r)
     end
     esconderBarra(self)
+    -- borda do menu mais discreta: 1 px cinza escuro (antes: grossa e preta)
+    local frame = self.menu_frame
+    if frame then
+        frame.bordersize = 1
+        frame.color = require("ffi/blitbuffer").COLOR_DARK_GRAY
+    end
     pcall(self.updateItems, self)
 end
 
