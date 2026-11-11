@@ -3,6 +3,8 @@
 -- "Connecting…", "Scanning for networks…", "Connected to network <nome>", "You can now
 -- retry…"). Agora aparece so o modal padrao do Lev ("Connecting to Wi-Fi…") do inicio ao
 -- fim da conexao. Se falhar, uma mensagem curta: "Couldn't connect to Wi-Fi".
+-- v2: durante a conexao nenhum aviso do sistema aparece (antes so os que citavam Wi-Fi/rede;
+-- faltavam "Authenticating…", os passos do driver e os codigos CTRL-EVENT).
 -- Perguntas (ex.: "ligar o Wi-Fi?") e a lista de redes continuam aparecendo normalmente.
 -- Para desfazer: apague este arquivo (koreader/patches/2-wifi-lev.lua).
 local UIManager = require("ui/uimanager")
@@ -13,13 +15,29 @@ local SOBRA = 6     -- segundos depois do fim em que avisos atrasados ainda sao 
 
 local sessao = { ativa = false, fim = 0 }
 
--- avisos tecnicos de rede que somem durante a conexao
-local PADROES = {
-    "turning on wi%-fi", "turning off wi%-fi", "connecting to", "connected to network",
-    "waiting for network", "scanning", "you can now retry",
-    "previous connection attempt", "obtaining", "wi%-fi", "network",
+-- textos que indicam que uma conexao comecou (abrem o modal)
+local INICIO = {
+    "turning on wi%-fi", "connecting", "scanning", "waiting for network", "authenticat",
+    "trying", "associat", "handshake", "obtaining",
 }
-local FALHAS = { "error connecting to the network", "connection failed" }
+-- textos de falha (trocados por uma mensagem curta)
+local FALHAS = {
+    "error connecting", "connection failed", "failed to authenticate", "timed out", "couldn't connect",
+}
+
+local InfoMessage = require("ui/widget/infomessage")
+local okN, Notification = pcall(require, "ui/widget/notification")
+
+-- e um aviso simples (InfoMessage / Notification)? Perguntas e listas nunca entram aqui.
+local function ehAviso(w)
+    if type(w) ~= "table" or rawget(w, "_lev_wifi") then return false end
+    local mt, n = getmetatable(w), 0
+    while mt and n < 20 do
+        if mt == InfoMessage or (okN and mt == Notification) then return true end
+        mt, n = getmetatable(mt), n + 1
+    end
+    return false
+end
 
 local function textoDe(w)
     local t = type(w) == "table" and rawget(w, "text")
@@ -27,6 +45,7 @@ local function textoDe(w)
 end
 
 local function bate(texto, lista)
+    if not texto then return false end
     for _, p in ipairs(lista) do
         if texto:find(p) then return true end
     end
@@ -59,24 +78,20 @@ local function avisoFalha()
     UIManager:show(InfoMessage:new{ text = "Couldn't connect to Wi-Fi", timeout = 3, _lev_wifi = true })
 end
 
--- esconde os avisos tecnicos enquanto conecta (e logo depois)
+-- enquanto conecta (e logo depois), nenhum aviso do sistema aparece: so o modal do Lev.
+-- Isso inclui "Authenticating…", os passos do driver ("Trying to associate…", codigos
+-- CTRL-EVENT…), "Authenticated", "Connected to network…" e os avisos do ZenOS.
 local mostrarOriginal = UIManager.show
 function UIManager:show(widget, ...)
-    local texto = textoDe(widget)
-    local eh_aviso = texto and not (type(widget) == "table" and rawget(widget, "_lev_wifi"))
-        and (widget.ok_callback == nil and widget.buttons == nil) -- nunca esconde perguntas
-    if eh_aviso then
-        if texto:find("turning on wi%-fi") or texto:find("connecting to wi%-fi")
-                or texto:find("^scanning") or texto:find("waiting for network") then
-            abrir()
-        end
+    if ehAviso(widget) then
+        local texto = textoDe(widget) or ""
+        if not sessao.ativa and bate(texto, INICIO) then abrir() end
         local na_janela = sessao.ativa or (os.time() - sessao.fim) <= SOBRA
-        if na_janela and bate(texto, FALHAS) then
-            fechar("falha")
-            avisoFalha()
-            return
-        end
-        if na_janela and bate(texto, PADROES) then
+        if na_janela then
+            if bate(texto, FALHAS) then
+                fechar("falha")
+                avisoFalha()
+            end
             return -- some: o modal do Lev ja mostra que esta conectando
         end
         if texto:find("turning off wi%-fi") then return end
