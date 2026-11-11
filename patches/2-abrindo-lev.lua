@@ -5,7 +5,7 @@
 --   * sair do livro para o Inicio/Biblioteca "Loading…"
 --   * outras telas (Spotify, Word of the day...) chamam _G.__LEV_MODAL
 --   * a barrinha de progresso do motor de EPUB (canto superior esquerdo) vira o mesmo modal
--- API: local m = _G.__LEV_MODAL.mostrar("Loading…")   -- desenha na hora
+-- API: local m = _G.__LEV_MODAL.mostrar("Loading…" [, segundos])  -- desenha na hora
 --      _G.__LEV_MODAL.fechar(m)                         -- ou fecha sozinho em 12 s
 -- Para desfazer: apague este arquivo (koreader/patches/2-abrindo-lev.lua).
 local Blitbuffer = require("ffi/blitbuffer")
@@ -86,13 +86,13 @@ function Modal:onCloseWidget()
 end
 
 local M = {}
-function M.mostrar(texto)
+function M.mostrar(texto, segundos)
     local dimen = geometria(texto or "Loading…")
     local m = Modal:new{ dimen = dimen, _lev_texto = texto or "Loading…" }
     UIManager:show(m, "ui", dimen, dimen.x, dimen.y)
     UIManager:forceRePaint()
     m._timeout = function() m._timeout = nil; UIManager:close(m) end
-    UIManager:scheduleIn(12, m._timeout)
+    UIManager:scheduleIn(segundos or 12, m._timeout)
     return m
 end
 function M.fechar(m)

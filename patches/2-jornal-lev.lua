@@ -228,15 +228,22 @@ local function baixarEmSegundoPlano()
             local aberto = leitor and leitor.document and leitor.document.file
             local nova = edicaoMaisNova()
             if aberto and nova and aberto ~= nova and aberto:sub(1, #PASTA) == PASTA then
-                local ConfirmBox = require("ui/widget/confirmbox")
-                UIManager:show(ConfirmBox:new{
-                    text = "A new edition of the news is ready.",
-                    ok_text = "Open", cancel_text = "Later",
-                    ok_callback = function()
-                        if ReaderUI.instance then ReaderUI.instance:switchDocument(nova) end
-                        UIManager:scheduleIn(8, function() pcall(limparAntigas) end)
-                    end,
-                })
+                -- so texto e dois botoes (sem o icone do ConfirmBox)
+                local ButtonDialog = require("ui/widget/buttondialog")
+                local dialogo
+                dialogo = ButtonDialog:new{
+                    title = "A new edition of the news is ready.",
+                    title_align = "center",
+                    buttons = {{
+                        { text = "Later", callback = function() UIManager:close(dialogo) end },
+                        { text = "Open", callback = function()
+                            UIManager:close(dialogo)
+                            if ReaderUI.instance then ReaderUI.instance:switchDocument(nova) end
+                            UIManager:scheduleIn(8, function() pcall(limparAntigas) end)
+                        end },
+                    }},
+                }
+                UIManager:show(dialogo)
             else
                 local ok_n, Notification = pcall(require, "ui/widget/notification")
                 if ok_n and Notification then
