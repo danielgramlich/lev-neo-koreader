@@ -325,3 +325,20 @@ function ReaderUI:init(...)
 end
 
 logger.info("Lev: barra inferior fixa no leitor ativa")
+
+-- Usado por outras telas do Lev (Ajustes, Spotify) que ficam acima da barra do ZenOS:
+-- a barra do Inicio do ZenOS sempre sublinha "Home", entao essas telas pintam esta copia
+-- por cima dela, com a propria aba sublinhada.
+_G.__LEV_BARRA = {
+    pintar = function(bb, ativa)
+        if not (barra.widget and barra.ativa == ativa and barra.largura == Screen:getWidth()) then
+            montarBarra(ativa)
+        end
+        local W, H = Screen:getWidth(), Screen:getHeight()
+        local zen_h = tonumber(rawget(_G, "__ZEN_UI_NAVBAR_HEIGHT")) or 0
+        local cobrir = math.max(zen_h, barra.altura or 0)
+        bb:paintRect(0, H - cobrir, W, cobrir, Blitbuffer.COLOR_WHITE)
+        barra.widget:paintTo(bb, 0, H - barra.altura)
+        return cobrir
+    end,
+}

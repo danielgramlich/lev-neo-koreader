@@ -367,6 +367,15 @@ function TelaSpotify:init()
     self.modo = "tocando"
     self.pilha = {}
     self:montar()
+    -- a barra de baixo com "Spotify" sublinhado (copia da barra do Lev, pintada por cima)
+    local pintarTela = self.paintTo
+    self.paintTo = function(tela, bb, x, y, ...)
+        local r = { pintarTela(tela, bb, x, y, ...) }
+        local B = rawget(_G, "__LEV_BARRA")
+        if B and B.pintar and tela.altura_barra > 0 then pcall(B.pintar, bb, "lev_spotify") end
+        return unpack(r)
+    end
+    UIManager:setDirty(nil, "ui", Geom:new{ x = 0, y = 0, w = W, h = H })
 end
 
 function TelaSpotify:alvo(widget, acao)
